@@ -3,7 +3,7 @@
 # project: bodyTracking_widget/bodyTracker.py
 # built-in
 from threading import Event, Thread, Lock
-from typing import Callable
+from typing import Callable, Union
 
 import mediapipe as mp
 import cv2
@@ -19,8 +19,10 @@ class BodyTracker:
 
     def __init__(self,
                  cb_sendBodyImage: Callable[[np.ndarray], None] = lambda image: None,
-                 cb_sendBodyPositions: Callable[[np.ndarray, np.ndarray], None] = lambda face_pos, body_pos: None,
-                 cameraIndex: int = 0):
+                 cb_sendBodyPositions: Callable[[np.ndarray], None] = lambda positions: None,
+                 cameraIndex: Union[int, str] = 0):
+        self._jointIndex = 0
+        self._results = None
         self._cameraIndex: int = cameraIndex
         self._h = None
         self._w = None
@@ -37,6 +39,7 @@ class BodyTracker:
         self._continueTracking: Event = Event()
         self.startTracking()
         self._distributor = Distributor()
+        self._track = True
 
     def trackBody_cont(self):
         """
@@ -47,28 +50,52 @@ class BodyTracker:
             while self._continueTracking.is_set():
                 # Initiate holistic model
                 ret, frame = self._cap.read()
-
-                # Recolor Feed
                 image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                # Recolor Feed
                 # Make Detections
-                results = holistic.process(image)
+                self._results = results = holistic.process(image)
                 # print(results.face_landmarks)
 
                 # face_landmarks, pose_landmarks, left_hand_landmarks, right_hand_landmarks
                 for bodyPart, code, plot in zip([results.right_hand_landmarks,
-                                           results.left_hand_landmarks,
-                                           results.pose_world_landmarks],
+                                                 results.left_hand_landmarks,
+                                                 results.pose_landmarks],
                                                 [self.RIGHT_HAND, self.LEFT_HAND, self.BODY],
-                                                [ "rightHand", "leftHand", "face"]):
-                    if bodyPart:
-                        pose = np.asarray([[l.x, l.y, l.z] for l in bodyPart.landmark],
-                                          dtype=np.float32)
-                        self._cb_sendBodyPositions(plot, np.mean(pose, axis=0))
-                        pose = (np.asarray((self._w, self._h, 0)) - pose) * 50
-                        self._distributor.sendData(code.to_bytes(1, "little") + pose.astype(np.float32).tobytes())
+                                                ["rightHand", "leftHand", "pose"]):
+                    if bodyPart and plot == "pose":
+                        for i, landmark in enumerate(bodyPart.landmark):
+                            color = (255, 0, 0) if i != self._jointIndex else (0, 255, 0)
+                            size = 2 if i != self._jointIndex else 5
+                            landmark = int(landmark.x * self._w), int(landmark.y * self._h), int(landmark.z * 10)
+                            image = cv2.circle(image, (landmark[0], landmark[1]), size, color, -1)
+                            if i == self._jointIndex:
+                                self._cb_sendBodyPositions(np.asarray(landmark))
 
-                self.showPredictions(image, results)
+                        # converted = self.convert_to_relative(bodyPart.landmark, image.shape[0], image.shape[1])[0]
+                        # print(bodyPart.landmark[20].x * self._w)
+                        pose = np.asarray([[int(landmark.x * self._w), int(landmark.y * self._h), int(landmark.z * 10)]
+                                          for landmark in bodyPart.landmark])
 
+                        self._distributor.sendData(code.to_bytes(1, "little") + pose.astype(np.int16).tobytes())
+                self._cb_sendBodyImage(image)
+
+                # self.showPredictions(image, results)
+
+    @staticmethod
+    def convert_to_relative(landmarks, image_width, image_height):
+        relative_landmarks = []
+        for lm in landmarks:
+            # Normalize the coordinates
+            x_norm = lm.x / image_width
+            y_norm = lm.y / image_height
+
+            # Adjust range to [-1, 1]
+            x_rel = 2 * x_norm - 1
+            y_rel = 2 * y_norm - 1
+
+            relative_landmarks.append((x_rel, y_rel))
+
+        return relative_landmarks
 
     def showPredictions(self, image, results):
         # # 1. Draw face landmarks
@@ -111,6 +138,14 @@ class BodyTracker:
                                             )
 
         self._cb_sendBodyImage(image)
+
+    def setJoint(self, jointIndex: int):
+        """
+        Change the joint to send data to the visualilzer
+        :param jointIndex: Index of the joint to send
+        """
+        self._jointIndex = jointIndex
+
     def setTrackingVisibility(self, settings: dict):
         """
         Update view settings
@@ -130,8 +165,12 @@ class BodyTracker:
         self._continueTracking.set()
         if self._cap is None:
             self._cap = cv2.VideoCapture(self._cameraIndex)
+            self._cap.set(3, 480)
+            self._cap.set(4, 640)
             success, img = self._cap.read()
+
             self._h, self._w, _ = img.shape
+            print(self._h, self._w)
         if self._bodyTrackingThread is None:
             self._bodyTrackingThread = Thread(target=self.trackBody_cont)
             self._bodyTrackingThread.start()

@@ -25,19 +25,54 @@ import pyqtgraph as pg
 # local
 from .src.tabWidget import Ui_Form
 
-
+mediapipe_body_joints = {
+    "nose": 0,
+    "left_eye_inner": 1,
+    "left_eye": 2,
+    "left_eye_outer": 3,
+    "right_eye_inner": 4,
+    "right_eye": 5,
+    "right_eye_outer": 6,
+    "left_ear": 7,
+    "right_ear": 8,
+    "mouth_left": 9,
+    "mouth_right": 10,
+    "left_shoulder": 11,
+    "right_shoulder": 12,
+    "left_elbow": 13,
+    "right_elbow": 14,
+    "left_wrist": 15,
+    "right_wrist": 16,
+    "left_pinky_1": 17,  # Tip of the left pinky finger
+    "right_pinky_1": 18, # Tip of the right pinky finger
+    "left_index_1": 19,  # Tip of the left index finger
+    "right_index_1": 20, # Tip of the right index finger
+    "left_thumb_2": 21,  # Second joint of the left thumb
+    "right_thumb_2": 22, # Second joint of the right thumb
+    "left_hip": 23,
+    "right_hip": 24,
+    "left_knee": 25,
+    "right_knee": 26,
+    "left_ankle": 27,
+    "right_ankle": 28,
+    "left_heel": 29,
+    "right_heel": 30,
+    "left_foot_index": 31, # Tip of the left foot
+    "right_foot_index": 32  # Tip of the right foot
+}
 class BodyTrackingWidget(QWidget, Ui_Form):
     _signal_toggleWebcam = QSignal(bool)
 
     def __init__(
-            self, parent=None, cb_updateTrackingVisibility: Callable[[dict], None] = lambda trackingSettings: None):
+            self, parent=None,
+            cb_updateTrackingVisibility: Callable[[dict], None] = lambda trackingSettings: None,
+            cb_updateJoint: Callable[[str, int], None] = lambda name, jointIndex: None):
         super().__init__(parent)
 
         self.history_length = 100
-        self.face_history = np.zeros((self.history_length, 3))
-        self.rightHand_history = np.zeros((self.history_length, 3))
-        self.leftHand_history = np.zeros((self.history_length, 3))
+        self._history = np.zeros((self.history_length, 3))
         self._cb_updateTrackingVisibility = cb_updateTrackingVisibility
+        self._cb_updateJoint = cb_updateJoint
         self._cameraRunning = True
         self._currentFrame = np.zeros((100, 100, 3))
         self._currentFrame_lock = Lock()
@@ -51,73 +86,41 @@ class BodyTrackingWidget(QWidget, Ui_Form):
     def setupUi(self, Form):
         super().setupUi(Form)
         # self.tabWidget.setVisible(False)
-        self.groupBox_xLandmarks.setVisible(False)
-        self.groupBox_yLandmarks.setVisible(False)
+        # self.groupBox_xLandmarks.setVisible(False)
+        # self.groupBox_yLandmarks.setVisible(False)
+        self.comboBox_jointSelection.addItems(list(mediapipe_body_joints.keys()))
         icon = self.style().standardIcon(QStyle.SP_MediaPlay)
         self.pushButton_play.setIcon(icon)
         # Create plot widget
         self.tab_positions.setLayout(QVBoxLayout())
-        self.plotWidget_face = pg.PlotWidget()
-        self.plotWidget_rightHand = pg.PlotWidget()
-        self.plotWidget_leftHand = pg.PlotWidget()
-        self.plotWidget_rightHand.setMaximumHeight(200)
-        self.plotWidget_leftHand.setMaximumHeight(200)
-        self.plotWidget_face.setMaximumHeight(200)
-        self.tab_positions.layout().addWidget(self.plotWidget_face)
-        self.tab_positions.layout().addWidget(self.plotWidget_rightHand)
-        self.tab_positions.layout().addWidget(self.plotWidget_leftHand)
+        self.plotWidget = pg.PlotWidget()
+        self.plotWidget.setYRange(0, 640)
+        self.tab_positions.layout().addWidget(self.plotWidget)
 
         # Set labels
-        self.plotWidget_face.setLabel('left', 'Position', units='m')
-        self.plotWidget_face.setLabel('bottom', 'Time', units='s')
-        self.plotWidget_face.setTitle("Face Position")
-        self.plotWidget_face.addLegend()
-
-        self.plotWidget_rightHand.setLabel('left', 'Position', units='m')
-        self.plotWidget_rightHand.setLabel('bottom', 'Time', units='s')
-        self.plotWidget_rightHand.setTitle("Right Hand Position")
-        self.plotWidget_rightHand.addLegend()
-
-        self.plotWidget_leftHand.setLabel('left', 'Position', units='m')
-        self.plotWidget_leftHand.setLabel('bottom', 'Time', units='s')
-        self.plotWidget_leftHand.setTitle("Left Hand Position")
-        self.plotWidget_leftHand.addLegend()
+        self.plotWidget.setLabel('left', 'Position', units='pixel')
+        self.plotWidget.setLabel('bottom', 'Time', units='s')
+        self.plotWidget.setTitle("Nose Position")
+        self.plotWidget.addLegend()
 
 
         # Plot initial data
-        self.face_plot_x = self.plotWidget_face.plot(pen='r', name='X')
-        self.face_plot_y = self.plotWidget_face.plot(pen='b', name='Y')
-        self.face_plot_z = self.plotWidget_face.plot(pen='g', name='Z')
-
-        self.rightHand_plot_x = self.plotWidget_rightHand.plot(pen='r', name='X')
-        self.rightHand_plot_y = self.plotWidget_rightHand.plot(pen='b', name='Y')
-        self.rightHand_plot_z = self.plotWidget_rightHand.plot(pen='g', name='Z')
-
-        self.leftHand_plot_x = self.plotWidget_leftHand.plot(pen='r', name='X')
-        self.leftHand_plot_y = self.plotWidget_leftHand.plot(pen='b', name='Y')
-        self.leftHand_plot_z = self.plotWidget_leftHand.plot(pen='g', name='Z')
+        self.plot_x = self.plotWidget.plot(pen='r', name='X')
+        self.plot_y = self.plotWidget.plot(pen='b', name='Y')
+        self.plot_z = self.plotWidget.plot(pen='g', name='Z')
 
         self._plots = {}
-        self._plots["face"] = (self.face_plot_x, self.face_plot_y, self.face_plot_z)
-        self._plots["rightHand"] = (self.rightHand_plot_x, self.rightHand_plot_y, self.rightHand_plot_z)
-        self._plots["leftHand"] = (self.leftHand_plot_x, self.leftHand_plot_y, self.leftHand_plot_z)
-        self._histories = {}
-        self._histories["face"] = self.face_history
-        self._histories["rightHand"] = self.rightHand_history
-        self._histories["leftHand"] = self.leftHand_history
 
-
-    def updatePosition(self, plot, pos):
+    def updatePosition(self, pos):
         # Append positions to history
-        x_plot, y_plot, z_plot = self._plots[plot]
 
-        self._histories[plot] = np.roll(self._histories[plot], -1, axis=0)
-        self._histories[plot][-1] = pos
+        self._history = np.roll(self._history, -1, axis=0)
+        self._history[-1] = pos
 
         # Update plots
-        x_plot.setData(y=self._histories[plot][:, 0])
-        y_plot.setData(y=self._histories[plot][:, 1])
-        z_plot.setData(y=self._histories[plot][:, 2])
+        self.plot_x.setData(y=self._history[:, 0])
+        self.plot_y.setData(y=self._history[:, 1])
+        self.plot_z.setData(y=self._history[:, 2])
 
 
     def _connectSignalSlots(self):
@@ -129,6 +132,9 @@ class BodyTrackingWidget(QWidget, Ui_Form):
         )
         self.pushButton_play.clicked.connect(
             self.pushButton_play_clicked_handler
+        )
+        self.comboBox_jointSelection.currentTextChanged.connect(
+            self.comboBox_jointSelection_currentTextChanged_handler
         )
         for checkBox in [self.checkBox_face, self.checkBox_rightHand, self.checkBox_leftHand, self.checkBox_body]:
             checkBox.stateChanged.connect(
@@ -151,6 +157,13 @@ class BodyTrackingWidget(QWidget, Ui_Form):
         pixmap = QPixmap.fromImage(image).scaled(self.label_cameraView.size())
         self.label_cameraView.setPixmap(pixmap)
 
+    def setName(self, name: str):
+        """
+        Name of the joint currently sending data
+        :param name: Name of the joint
+        """
+        self.plotWidget.setTitle(f"{name} Position")
+
     def setImage(self, image: np.ndarray):
         """
         Set the current image
@@ -167,6 +180,12 @@ class BodyTrackingWidget(QWidget, Ui_Form):
         """
         self._signal_toggleWebcam.emit(active)
 
+    def comboBox_jointSelection_currentTextChanged_handler(self, text: str):
+        """
+        Notifies the body tracker which joint to send
+        :param text: Select text from the combo box
+        """
+        self._cb_updateJoint(text, mediapipe_body_joints.get(text, 0))
     def pushButton_play_clicked_handler(self):
         """
         Play or pause the video input

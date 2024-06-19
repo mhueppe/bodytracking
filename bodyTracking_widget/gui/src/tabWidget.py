@@ -17,9 +17,9 @@ class Ui_Form(object):
     def setupUi(self, Form):
         if not Form.objectName():
             Form.setObjectName(u"Form")
-        Form.resize(645, 891)
-        self.gridLayout_4 = QGridLayout(Form)
-        self.gridLayout_4.setObjectName(u"gridLayout_4")
+        Form.resize(874, 891)
+        self.horizontalLayout_4 = QHBoxLayout(Form)
+        self.horizontalLayout_4.setObjectName(u"horizontalLayout_4")
         self.label_cameraView = QLabel(Form)
         self.label_cameraView.setObjectName(u"label_cameraView")
         sizePolicy = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
@@ -30,11 +30,11 @@ class Ui_Form(object):
         self.label_cameraView.setMinimumSize(QSize(300, 300))
         self.label_cameraView.setMaximumSize(QSize(3000, 3000))
 
-        self.gridLayout_4.addWidget(self.label_cameraView, 0, 0, 1, 3)
+        self.horizontalLayout_4.addWidget(self.label_cameraView)
 
         self.tabWidget = QTabWidget(Form)
         self.tabWidget.setObjectName(u"tabWidget")
-        sizePolicy1 = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Maximum)
+        sizePolicy1 = QSizePolicy(QSizePolicy.Maximum, QSizePolicy.Minimum)
         sizePolicy1.setHorizontalStretch(0)
         sizePolicy1.setVerticalStretch(0)
         sizePolicy1.setHeightForWidth(self.tabWidget.sizePolicy().hasHeightForWidth())
@@ -43,6 +43,30 @@ class Ui_Form(object):
         self.tab_positions.setObjectName(u"tab_positions")
         self.verticalLayout_4 = QVBoxLayout(self.tab_positions)
         self.verticalLayout_4.setObjectName(u"verticalLayout_4")
+        self.frame_2 = QFrame(self.tab_positions)
+        self.frame_2.setObjectName(u"frame_2")
+        sizePolicy2 = QSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
+        sizePolicy2.setHorizontalStretch(0)
+        sizePolicy2.setVerticalStretch(0)
+        sizePolicy2.setHeightForWidth(self.frame_2.sizePolicy().hasHeightForWidth())
+        self.frame_2.setSizePolicy(sizePolicy2)
+        self.frame_2.setFrameShape(QFrame.StyledPanel)
+        self.frame_2.setFrameShadow(QFrame.Raised)
+        self.horizontalLayout_3 = QHBoxLayout(self.frame_2)
+        self.horizontalLayout_3.setObjectName(u"horizontalLayout_3")
+        self.label = QLabel(self.frame_2)
+        self.label.setObjectName(u"label")
+
+        self.horizontalLayout_3.addWidget(self.label)
+
+        self.comboBox_jointSelection = QComboBox(self.frame_2)
+        self.comboBox_jointSelection.setObjectName(u"comboBox_jointSelection")
+
+        self.horizontalLayout_3.addWidget(self.comboBox_jointSelection)
+
+
+        self.verticalLayout_4.addWidget(self.frame_2)
+
         self.tabWidget.addTab(self.tab_positions, "")
         self.tab_hands = QWidget()
         self.tab_hands.setObjectName(u"tab_hands")
@@ -50,9 +74,6 @@ class Ui_Form(object):
         self.horizontalLayout.setObjectName(u"horizontalLayout")
         self.frame = QFrame(self.tab_hands)
         self.frame.setObjectName(u"frame")
-        sizePolicy2 = QSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
-        sizePolicy2.setHorizontalStretch(0)
-        sizePolicy2.setVerticalStretch(0)
         sizePolicy2.setHeightForWidth(self.frame.sizePolicy().hasHeightForWidth())
         self.frame.setSizePolicy(sizePolicy2)
         self.frame.setFrameShape(QFrame.StyledPanel)
@@ -195,7 +216,7 @@ class Ui_Form(object):
 
         self.tabWidget.addTab(self.tab_hands, "")
 
-        self.gridLayout_4.addWidget(self.tabWidget, 1, 0, 1, 3)
+        self.horizontalLayout_4.addWidget(self.tabWidget)
 
 
         self.retranslateUi(Form)
@@ -209,6 +230,7 @@ class Ui_Form(object):
     def retranslateUi(self, Form):
         Form.setWindowTitle(QCoreApplication.translate("Form", u"Form", None))
         self.label_cameraView.setText(QCoreApplication.translate("Form", u"Camera View", None))
+        self.label.setText(QCoreApplication.translate("Form", u"Joint", None))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_positions), QCoreApplication.translate("Form", u"Positions", None))
         self.groupBox_xLandmarks.setTitle(QCoreApplication.translate("Form", u"X Landmarks", None))
         self.label_left.setText(QCoreApplication.translate("Form", u"Position", None))

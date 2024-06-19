@@ -15,10 +15,16 @@ class BodyTrackerWindow(QMainWindow):
         self.setWindowTitle("Body Tracking")
 
         # Create instance for gui
-        self.mainView = BodyTrackingWidget(cb_updateTrackingVisibility=self._gui_updateBodyTrackingVisibility)
+        self.mainView = BodyTrackingWidget(
+            cb_updateTrackingVisibility=self._gui_updateBodyTrackingVisibility,
+            cb_updateJoint=self._gui_updateJoint
+        )
         # Create instance for body tracking
+        # cam_input = r"C:\Users\mhuep\Master_Informatik\Semester_2\InteractiveGameDesign\bodytracking\sample_video.mov"
+        cam_input = 0
         self._bodyTracker = BodyTracker(cb_sendBodyImage=self._bodyTracker_sendBodyImage,
-                                        cb_sendBodyPositions=self._bodyTracker_sendBodyPositions)
+                                        cb_sendBodyPositions=self._bodyTracker_sendBodyPositions,
+                                        cameraIndex=cam_input)
         # Set custom widget as central widget
         self.setCentralWidget(self.mainView)
         self.mainView.handle_toggleWebcam(True)
@@ -31,6 +37,15 @@ class BodyTrackerWindow(QMainWindow):
         :return:
         """
         self._bodyTracker.setTrackingVisibility(settings)
+
+    def _gui_updateJoint(self, name: str, jointIndex: int):
+        """
+        Update the joint for the view and which joint to send
+        :param name: Specification of the joint
+        :param jointIndex: Index of the joint
+        """
+        self._bodyTracker.setJoint(jointIndex)
+        self.mainView.setName(name)
     # body Tracking handling
     def _bodyTracker_sendBodyImage(self, image: np.ndarray):
         """
@@ -40,13 +55,13 @@ class BodyTrackerWindow(QMainWindow):
         """
         self.mainView.setImage(image)
 
-    def _bodyTracker_sendBodyPositions(self, face_pos: np.ndarray, body_pos: np.ndarray):
+    def _bodyTracker_sendBodyPositions(self, positions: np.ndarray):
         """
         Distribute the positions of the body
         :param positions:
         :return:
         """
-        self.mainView.updatePosition(face_pos, body_pos)
+        self.mainView.updatePosition(positions)
 def main():
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
