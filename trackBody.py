@@ -12,7 +12,6 @@ if __name__ == "__main__":
     parser.add_argument("--headless", action="store_true", help="Run in headless mode")
     parser.add_argument("--camera_index", type=int, default=0, help="Camera Index value (default: 0)")
     args = parser.parse_args()
-    args.headless = False
     if args.headless:
         bodyTracker = BodyTracker()
         bodyTracker.setTrackingVisibility(
