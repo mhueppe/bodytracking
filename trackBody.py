@@ -5,7 +5,6 @@
 import argparse
 import time
 
-from bodyTracking_widget.resources.bodyTracker import BodyTracker
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Script with headless option")
@@ -14,6 +13,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     args.headless = False
     if args.headless:
+        from bodyTracking_widget.resources.bodyTracker import BodyTracker
+
         bodyTracker = BodyTracker()
         bodyTracker.setTrackingVisibility(
             {"face": False,
@@ -24,6 +25,7 @@ if __name__ == "__main__":
         prompt = "Enter q to quit"
         response = input(prompt)
         while response.lower() != "q":
+
             response = input(prompt)
     else:
         from bodyTracking_widget.movement_detection import main

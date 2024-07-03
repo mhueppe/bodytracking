@@ -4,6 +4,7 @@
 # built-in
 from threading import Event, Thread, Lock
 from typing import Callable, Union
+import mmap
 
 import mediapipe as mp
 import cv2
@@ -16,6 +17,7 @@ class BodyTracker:
     LEFT_HAND = 0x01
     RIGHT_HAND = 0x02
     BODY = 0x03
+    IMAGE = 0x04
 
     def __init__(self,
                  cb_sendBodyImage: Callable[[np.ndarray], None] = lambda image: None,
@@ -24,8 +26,8 @@ class BodyTracker:
         self._jointIndex = 0
         self._results = None
         self._cameraIndex: int = cameraIndex
-        self._h = None
-        self._w = None
+        self._h = 480
+        self._w = 640
         self._show_face = True
         self._show_rightHand = True
         self._show_leftHand = True
@@ -39,6 +41,8 @@ class BodyTracker:
         self._continueTracking: Event = Event()
         self.startTracking()
         self._distributor = Distributor()
+        self.shm = mmap.mmap(-1, self._w * self._h * 3, "shared_memory")
+
         self._track = True
 
     def trackBody_cont(self):
@@ -55,6 +59,7 @@ class BodyTracker:
                 # Make Detections
                 self._results = results = holistic.process(image)
                 # print(results.face_landmarks)
+                self.shm.write(cv2.flip(image, 0).tobytes())
 
                 # face_landmarks, pose_landmarks, left_hand_landmarks, right_hand_landmarks
                 for bodyPart, code, plot in zip([results.right_hand_landmarks,
@@ -77,6 +82,7 @@ class BodyTracker:
                                           for landmark in bodyPart.landmark])
 
                         self._distributor.sendData(code.to_bytes(1, "little") + pose.astype(np.int16).tobytes())
+                self.shm.seek(0)
                 self._cb_sendBodyImage(image)
 
                 # self.showPredictions(image, results)
@@ -165,8 +171,8 @@ class BodyTracker:
         self._continueTracking.set()
         if self._cap is None:
             self._cap = cv2.VideoCapture(self._cameraIndex)
-            self._cap.set(3, 480)
-            self._cap.set(4, 640)
+            self._cap.set(3, self._w)
+            self._cap.set(4, self._h)
             success, img = self._cap.read()
 
             self._h, self._w, _ = img.shape
